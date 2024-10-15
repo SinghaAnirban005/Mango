@@ -140,9 +140,81 @@ const updateComicBook = asyncHandler(async(req, res) => {
     }
 })
 
+const getInventory = asyncHandler(async(req, res) => {
+    try {
+        const pages = parseInt(req.query.pages) || 1
+        const limit = parseInt(req.query.limit) || 10
+        const skip = (pages - 1) * limit
+
+        const conditions = {}
+
+        if(req.query.author){
+            const authorSearch = req.query.author.trim().replace(/\s+/g, '\\s+');
+            conditions.authorName = new RegExp(`\\b${authorSearch}\\b`, 'i');
+        }
+
+        if(req.query.year){
+            conditions.yearOfPublication = req.query.year
+        }
+
+        if(req.query.minPrice && req.query.maxPrice) {
+            conditions.price = {
+                $gte: req.query.minPrice,
+                $lte: req.query.maxPrice
+            }
+        }   
+
+        if(req.query.condition) {
+            conditions.condition = req.query.condition
+        }
+
+        let sort={}
+
+        if(req.query.sortBy) {
+            const sortParameter = req.query.sortBy
+            const sortOrder = req.query.order === 'desc' ? -1 : 1 // By default sort in ascending order
+
+            sort[sortParameter] = sortOrder
+        }
+        else{
+            sort = {
+                bookName: 1 // by default we wil sort by bookName in ascending order 
+            }
+        }
+
+        const book = await Comic.find(conditions)
+                                .sort(sort)
+                                .limit(limit) 
+                                .skip(skip)
+
+        const total = await Comic.countDocuments(conditions)
+
+        return res
+               .status(200)
+               .json(
+                new ApiResponse(
+                    200,
+                    {
+                        pages,
+                        total,
+                        limit,
+                        totalPages: Math.ceil(total / limit),
+                        book
+                    },
+                    "Successfully fetched inventory"
+                )
+               )
+
+    } catch (error) {
+        console.log(error?.message)
+        throw new ApiError(500, "Failed to get comics from inventory ")
+    }
+})
+
 export {
     addComicBook,
     deleteBook,
     getBooks,
-    updateComicBook
+    updateComicBook,
+    getInventory
 }
