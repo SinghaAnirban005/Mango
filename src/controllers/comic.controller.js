@@ -2,44 +2,48 @@ import {asyncHandler} from "../utils/asyncHandler.js"
 import { ApiError } from "../utils/ApiError.js"
 import { ApiResponse } from "../utils/ApiResponse.js"
 
+import { zodSchema } from "../validator/comic.validator.js"
+import { z } from "zod"
 import { Comic } from "../models/Comic.model.js" 
 
 const addComicBook = asyncHandler(async(req, res) => {
     try {
-        const { bookName, authorName, yearOfPublication, price, discount, numberOfPages, condition, description } = req.body;
+        // Validate request body using Zod schema
+        const validatedData = zodSchema.parse(req.body);
 
-        if (!bookName || !authorName || !yearOfPublication || !price || !numberOfPages || !condition) {
-            throw new ApiError(400, "Please provide the required fields")
-        }
+        // Creating a comic book collection
+        const comicBook = await Comic.create(validatedData);
 
-        const comicBook = await Comic.create(
-            {
-                bookName,
-                authorName,
-                yearOfPublication,
-                price,
-                discount: discount || 0,
-                numberOfPages,
-                condition,
-                description
-            }
-        )
-
-        if(!comicBook) {
-            throw new ApiError(400, "Failed to add comic book in inventory")
+        if (!comicBook) {
+            throw new ApiError(400, "Failed to add comic book in inventory");
         }
 
         return res
-        .status(200)
-        .json(
-            new ApiResponse(
-                200,
-                comicBook,
-                "Succesfully added comic book"
-            )
-        )
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    comicBook,
+                    "Successfully added comic book"
+                )
+            );
+
     } catch (error) {
-        throw new ApiError(500, error?.message)
+        if (error instanceof z.ZodError) {
+           
+            return res
+                .status(400)
+                .json(
+                    {
+                    status: 400,
+                    message: "Validation error",
+                    errors: error.errors 
+                }
+        );
+
+        }
+        
+        throw new ApiError(500, "Server error :: " + error?.message);
     }
 })
 
@@ -68,7 +72,7 @@ const deleteBook = asyncHandler(async(req, res) => {
         )
     )
     } catch (error) {
-        throw new ApiError(500, error?.message)
+        throw new ApiError(500, "Server error ::" + error?.message)
     }
 })
 
@@ -98,13 +102,13 @@ const getBooks = asyncHandler(async(req, res) => {
             )
         )
     } catch (error) {
-        throw new ApiError(400, error?.message)
+        throw new ApiError(500, "Server error ::" + error?.message)
     }
 })
 
 const updateComicBook = asyncHandler(async(req, res) => {
     try {
-        const {id} = req.params
+        const { id } = req.params
 
         if(!id) {   
             throw new ApiError(400, "No book id found")
@@ -112,6 +116,7 @@ const updateComicBook = asyncHandler(async(req, res) => {
 
         const data = req.body
 
+        // Updates Book with an id using data
         const updatedBook = await Comic.findByIdAndUpdate(
             id,
             data,
@@ -136,21 +141,23 @@ const updateComicBook = asyncHandler(async(req, res) => {
 
     } catch (error) {
         console.log(error)
-        throw new ApiError(500, "Something went wrong !!")
+        throw new ApiError(500, "Something went wrong :: " + error?.message)
     }
 })
 
 const getInventory = asyncHandler(async(req, res) => {
     try {
+        // Parsing into integer type since by default it is String
         const pages = parseInt(req.query.pages) || 1
         const limit = parseInt(req.query.limit) || 10
-        const skip = (pages - 1) * limit
+        const skip = (pages - 1) * limit // Handling pagination
 
         const conditions = {}
-
+        // here we will check for any provided parameters for filtering Books
+        // Generally author, price, year and condition
         if(req.query.author){
             const authorSearch = req.query.author.trim().replace(/\s+/g, '\\s+');
-            conditions.authorName = new RegExp(`\\b${authorSearch}\\b`, 'i');
+            conditions.authorName = new RegExp(`\\b${authorSearch}\\b`, 'i'); // regex to match full words, ignoring case and handling extra spaces
         }
 
         if(req.query.year){
@@ -169,7 +176,7 @@ const getInventory = asyncHandler(async(req, res) => {
         }
 
         let sort={}
-
+        // sorting based on any one of the attributes of comic book model
         if(req.query.sortBy) {
             const sortParameter = req.query.sortBy
             const sortOrder = req.query.order === 'desc' ? -1 : 1 // By default sort in ascending order
@@ -207,7 +214,7 @@ const getInventory = asyncHandler(async(req, res) => {
 
     } catch (error) {
         console.log(error?.message)
-        throw new ApiError(500, "Failed to get comics from inventory ")
+        throw new ApiError(500, "Someting went wriing while fetching inventory ::" + error?.message)
     }
 })
 
