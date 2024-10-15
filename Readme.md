@@ -16,7 +16,7 @@ To install Mango Backend, follow these steps:
 
 1. Clone the repository
    ```sh
-   git clone <repository-url>
+   git clone https://github.com/SinghaAnirban005/Mango.git
 2. Naviagate to the project directory
     ```sh
     cd mango
